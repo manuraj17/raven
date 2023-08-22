@@ -2,20 +2,20 @@ use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Read;
+use std::io::{self, Write};
 use std::path::Path;
+use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use std::process::Command;
-use std::io::{self, Write};
 
 #[derive(Deserialize, Clone, Debug)]
 struct Sync {
-    script: String
+    script: String,
 }
 #[derive(Deserialize, Clone, Debug)]
 struct Target {
     path: String,
-    sync: Sync
+    sync: Sync,
 }
 
 #[derive(Deserialize, Clone)]
@@ -29,16 +29,14 @@ struct RavenMessage {
     event: Event,
 }
 
-fn parse_raven_config() -> RavenConfig {
+fn parse_raven_config(file_path: &str) -> RavenConfig {
     // Load config file into string
-    let mut file =
-        File::open("sample.config.toml").expect("Failed to open config file");
+    let mut file = File::open(file_path).expect("Failed to open config file");
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read file");
 
     // Parse config
-    // let raven_config: RavenConfig = toml::from_str(&contents).unwrap();
     toml::from_str(&contents).unwrap()
 }
 
@@ -77,7 +75,10 @@ fn watch(target: Target, ms: std::sync::mpsc::Sender<RavenMessage>) -> notify::R
     for res in rx {
         match res {
             Ok(event) => {
-                let rm = RavenMessage { path: path.to_str().unwrap().to_owned(), event: event};
+                let rm = RavenMessage {
+                    path: path.to_str().unwrap().to_owned(),
+                    event: event,
+                };
                 println!("Publishing Change: {rm:?}");
                 if let Err(error) = ms.send(rm) {
                     log::error!("Error: {error:?}");
@@ -94,11 +95,11 @@ fn watch(target: Target, ms: std::sync::mpsc::Sender<RavenMessage>) -> notify::R
     Ok(())
 }
 
-
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let raven_config = parse_raven_config();
+    let config_file_path = "./sample.config.toml";
+    let raven_config = parse_raven_config(config_file_path);
 
     // Channel to receive updates
     let (master_sender, master_receiver): (Sender<RavenMessage>, Receiver<RavenMessage>) =
@@ -116,14 +117,27 @@ fn main() {
                 log::error!("Error: {error:?}");
             }
         });
-
     }
 
     for res in master_receiver {
         match res {
-            event => display_changes(event)
+            event => display_changes(event),
         }
     }
 }
 
+// TODO: Update tests
+#[cfg(test)]
+mod tests {
+    use crate::parse_raven_config;
 
+    #[test]
+    fn test_parse_config() {
+        let test_config_file_path = "./sample.config.toml";
+        let parsed_config = parse_raven_config(test_config_file_path);
+
+        assert_eq!(parsed_config.targets.iter().len(), 2);
+        assert_eq!(parsed_config.targets.first().unwrap().path, "/Users/manu/package.json");
+        assert_eq!(parsed_config.targets.first().unwrap().sync.script, "./test.sh");
+    }
+}
