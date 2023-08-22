@@ -1,0 +1,7 @@
+[[targets]]
+path = "/Users/manu/package.json"
+sync = { script = "./test.sh" }
+
+[[targets]]
+path = "/Users/manu/Code/github/manuraj17/ptl"
+sync = { script = "" }
