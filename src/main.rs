@@ -28,14 +28,18 @@ struct RavenMessage {
 }
 
 fn parse_raven_config(file_path: &str) -> RavenConfig {
-    // Load config file into string
-    let mut file = File::open(file_path).expect("Failed to open config file");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .expect("Failed to read file");
+    let home_dir = std::env::var_os("HOME").expect("no home directory");
+    let mut config_path = std::path::PathBuf::new();
+    config_path.push(home_dir);
+    config_path.push(file_path);
 
-    // Parse config
-    toml::from_str(&contents).unwrap()
+    let config_content = if let Ok(content) = std::fs::read(&config_path) {
+        String::from_utf8_lossy(&content).to_string()
+    } else {
+        "This is the default content\n".to_owned()
+    };
+
+    toml::from_str(&config_content).unwrap()
 }
 
 fn display_changes(message: RavenMessage) {
@@ -45,11 +49,18 @@ fn display_changes(message: RavenMessage) {
 
 fn run_sync_command(target: Target) {
     let script = target.sync.script;
+    let target_path = std::path::PathBuf::from(target.path);
+
+    let cdir = if target_path.is_dir() {
+        target_path.to_str()
+    } else {
+        target_path.parent().unwrap().to_str()
+    };
+
     let c = Command::new(script)
-        // .arg("status")
-        .current_dir("/Users/manu/Code/github/manuraj17/raven")
+        .current_dir(cdir.unwrap())
         .output()
-        .expect("ls command failed to execute");
+        .expect("sync command failed to execute");
 
     if c.status.success() {
         log::info!("Sync succeeded");
@@ -96,7 +107,7 @@ fn watch(target: Target, ms: std::sync::mpsc::Sender<RavenMessage>) -> notify::R
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let config_file_path = "./sample.config.toml";
+    let config_file_path = ".config/raven/config.toml";
     let raven_config = parse_raven_config(config_file_path);
 
     // Channel to receive updates
@@ -135,7 +146,13 @@ mod tests {
         let parsed_config = parse_raven_config(test_config_file_path);
 
         assert_eq!(parsed_config.targets.iter().len(), 2);
-        assert_eq!(parsed_config.targets.first().unwrap().path, "/Users/manu/package.json");
-        assert_eq!(parsed_config.targets.first().unwrap().sync.script, "./test.sh");
+        assert_eq!(
+            parsed_config.targets.first().unwrap().path,
+            "/Users/user/sample.txt"
+        );
+        assert_eq!(
+            parsed_config.targets.first().unwrap().sync.script,
+            "./sync.sh"
+        );
     }
 }
