@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
 
-echo "Hello, World!"
+now=$(date)
+echo "Current date: $now"

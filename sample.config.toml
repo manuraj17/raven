@@ -1,7 +1,7 @@
 [[targets]]
-path = "/Users/manu/package.json"
-sync = { script = "./test.sh" }
+path = "/Users/user/sample.txt"
+sync = { script = "./sync.sh" }
 
 [[targets]]
-path = "/Users/manu/Code/github/manuraj17/ptl"
+path = "/Users/user/folder"
 sync = { script = "" }

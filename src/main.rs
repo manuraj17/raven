@@ -1,7 +1,5 @@
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
-use std::fs::File;
-use std::io::Read;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
