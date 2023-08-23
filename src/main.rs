@@ -27,11 +27,11 @@ struct RavenMessage {
     event: Event,
 }
 
-fn parse_raven_config(file_path: &str) -> RavenConfig {
+fn config_from_config_folder() -> RavenConfig {
     let home_dir = std::env::var_os("HOME").expect("no home directory");
     let mut config_path = std::path::PathBuf::new();
     config_path.push(home_dir);
-    config_path.push(file_path);
+    config_path.push(".config/raven/config.toml");
 
     let config_content = if let Ok(content) = std::fs::read(&config_path) {
         String::from_utf8_lossy(&content).to_string()
@@ -40,6 +40,26 @@ fn parse_raven_config(file_path: &str) -> RavenConfig {
     };
 
     toml::from_str(&config_content).unwrap()
+}
+
+fn config_from_passed_path(path: &str) -> RavenConfig {
+    let mut config_path = std::path::PathBuf::new();
+    config_path.push(path);
+
+    let config_content = if let Ok(content) = std::fs::read(&config_path) {
+        String::from_utf8_lossy(&content).to_string()
+    } else {
+        "This is the default content\n".to_owned()
+    };
+
+    toml::from_str(&config_content).unwrap()
+}
+
+fn parse_raven_config(file_path: Option<&str>) -> RavenConfig {
+    match file_path {
+        None => config_from_config_folder(),
+        Some(val) => config_from_passed_path(val),
+    }
 }
 
 fn display_changes(message: RavenMessage) {
@@ -107,8 +127,7 @@ fn watch(target: Target, ms: std::sync::mpsc::Sender<RavenMessage>) -> notify::R
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let config_file_path = ".config/raven/config.toml";
-    let raven_config = parse_raven_config(config_file_path);
+    let raven_config = parse_raven_config(None);
 
     // Channel to receive updates
     let (master_sender, master_receiver): (Sender<RavenMessage>, Receiver<RavenMessage>) =
@@ -143,9 +162,9 @@ mod tests {
     #[test]
     fn test_parse_config() {
         let test_config_file_path = "./sample.config.toml";
-        let parsed_config = parse_raven_config(test_config_file_path);
+        let parsed_config = parse_raven_config(Some(&test_config_file_path));
 
-        assert_eq!(parsed_config.targets.iter().len(), 2);
+        assert_eq!(parsed_config.targets.iter().len(), 1);
         assert_eq!(
             parsed_config.targets.first().unwrap().path,
             "/Users/user/sample.txt"

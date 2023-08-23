@@ -2,6 +2,6 @@
 path = "/Users/user/sample.txt"
 sync = { script = "./sync.sh" }
 
-[[targets]]
-path = "/Users/user/folder"
-sync = { script = "" }
+# [[targets]]
+# path = "/Users/user/folder"
+# sync = { script = "" }
