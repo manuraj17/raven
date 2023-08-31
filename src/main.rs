@@ -106,7 +106,7 @@ fn watch(target: Target, ms: std::sync::mpsc::Sender<RavenMessage>) -> notify::R
             Ok(event) => {
                 let rm = RavenMessage {
                     path: path.to_str().unwrap().to_owned(),
-                    event: event,
+                    event,
                 };
                 println!("Publishing Change: {rm:?}");
                 if let Err(error) = ms.send(rm) {
