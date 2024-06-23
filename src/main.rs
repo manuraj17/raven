@@ -1,10 +1,11 @@
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
+use std::thread::JoinHandle;
 
 #[derive(Deserialize, Clone, Debug)]
 struct Sync {
@@ -46,13 +47,16 @@ fn config_from_passed_path(path: &str) -> RavenConfig {
     let mut config_path = std::path::PathBuf::new();
     config_path.push(path);
 
-    let config_content = if let Ok(content) = std::fs::read(&config_path) {
+    let config_content = load_config_from_file(&config_path);
+    toml::from_str(&config_content).unwrap()
+}
+
+fn load_config_from_file(config_path: &PathBuf) -> String {
+    if let Ok(content) = std::fs::read(&config_path) {
         String::from_utf8_lossy(&content).to_string()
     } else {
         "This is the default content\n".to_owned()
-    };
-
-    toml::from_str(&config_content).unwrap()
+    }
 }
 
 fn parse_raven_config(file_path: Option<&str>) -> RavenConfig {
@@ -133,6 +137,8 @@ fn main() {
     let (master_sender, master_receiver): (Sender<RavenMessage>, Receiver<RavenMessage>) =
         channel();
 
+    let mut handles = Vec::new();
+
     // loop through each target and print the value
     for target in raven_config.targets.iter() {
         let sender_clone = master_sender.clone();
@@ -140,17 +146,29 @@ fn main() {
 
         log::info!("Watching {}", c_target.path);
 
-        thread::spawn(|| {
+        let handle = thread::spawn(|| {
             if let Err(error) = watch(c_target, sender_clone) {
                 log::error!("Error: {error:?}");
             }
         });
+
+        handles.push(handle);
     }
 
-    for res in master_receiver {
-        match res {
-            event => display_changes(event),
+    println!("On watch");
+
+    let thread_display_messages = thread::spawn(move || {
+        for res in master_receiver {
+            match res {
+                event => display_changes(event),
+            }
         }
+    });
+
+    handles.push(thread_display_messages);
+
+    for h in handles {
+        h.join().expect("Thread could not be joined");
     }
 }
 
